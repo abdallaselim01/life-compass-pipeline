@@ -1,6 +1,6 @@
 yt-dlp>=2026.7.4   # the system keeps a newer copy in vendor/ by itself (src/lifecompass/ytdlp_update.py)
 google-genai==2.16.0
 pydantic==2.13.4
-python-dotenv==1.2.2
+python-dotenv==1.2.4
 requests==2.34.2
 imageio-ffmpeg==0.6.0
