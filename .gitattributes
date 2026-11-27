@@ -1,0 +1,2 @@
+# keep every file's line endings exactly as they are (the project mixes CRLF and LF on purpose)
+* -text

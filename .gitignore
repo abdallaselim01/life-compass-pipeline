@@ -1,0 +1,22 @@
+# Secrets, data and bulky or generated things stay out of git.
+.env
+data/
+backups/
+logs/
+vendor/
+_TRASH_STAGING_*/
+__pycache__/
+*.pyc
+.pytest_cache/
+windows_config/acl_backup_env_*.txt
+listener.log
+
+# third-party audit tool, local only
+experiments/tools/
+
+# local working notes (dated design/audit/maintenance logs); only the English docs below are published
+docs/*
+!docs/README.md
+!docs/architecture.md
+!docs/setup.md
+!docs/configuration.md

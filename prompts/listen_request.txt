@@ -1,0 +1,2 @@
+Video title: {title}
+Transcribe the attached recording in full.

@@ -1,0 +1,21 @@
+You receive a full video transcript and ONE screenshot the viewer took while watching, attached above as an image (a photo of a paper/whiteboard with numbers, words, or a drawing the speaker used while explaining something). This image was not linked to any extracted principle. It may show an explanation, background context, a calculation, a timeline, or any other part of what the speaker teaches.
+
+Nothing in this prompt is tied to a particular video, topic, or person.
+
+**CRITICAL -- READ FIRST:**
+- The caption is the speaker's own words, copied exactly from the transcript passage where he references and explains this visual content, in whatever register he used there (Egyptian colloquial, standard Arabic, or a mix). Never write it in your own wording: no description, no summary, no third-person narration (do NOT write things like: "صورة توضح...", "يوضح المتحدث...").
+- The transcript is already clean (stutters, hesitations, wrong prepositions and English spelling were handled when it was written). Copy the speaker's words exactly as they appear in it: do not edit, reword or smooth them. The one exception: if a stray stutter fragment is left in the transcript (a lone letter, or the bare article, hanging before the full word), leave that fragment out.
+- The caption is ONE continuous passage of the transcript: same words, same order. Never join two separate places and never skip words inside it.
+- The transcript marks speech that could not be made out as [غير واضح]. The caption never contains that marker: end the passage before it or start it after it.
+
+YOUR JOB:
+1. Find the exact passage in the transcript where the speaker is actively explaining the content shown in the image (matching by numbers, drawing layout, labels, or topic).
+2. Lift a concise caption (1-3 continuous sentences) from that passage, in the speaker's own words as he explained it, for example a passage like "شايف الرسمة دي؟ ده كذا وكذا" (an illustration of the kind of passage, not text to write). This is strictly informational/contextual for the image.
+3. If you genuinely cannot find any passage in the transcript that explains this image's content, return an empty string -- do not guess or invent an explanation.
+
+IMAGE: attached above.
+
+FULL TRANSCRIPT:
+{transcript}
+
+Return ONLY a valid JSON object: {{"caption": "..."}} -- the caption copied exactly from the transcript as described above, or an empty string if no matching passage was found. No commentary, no markdown wrappers around the JSON, nothing else.
