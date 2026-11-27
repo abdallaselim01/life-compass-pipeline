@@ -1,0 +1,81 @@
+# Life Compass settings: every number that may change, in one place.
+# A key removed from here falls back to its built-in default (the values written below are the defaults themselves).
+# A wrong or out-of-range value is ignored with a warning in the log; it never stops the system.
+# A change takes effect when the process starts: scheduled tasks every run, the listener after a restart (the watchdog does that).
+# Deliberately NOT here: the prompts and the API settings that go into the stage fingerprints, and the keys (.env).
+# Models: the chain family and the names that follow it are settings here ([models] family and after); the model names are discovered from Google (src/lifecompass/modelchain.py) and the order is fixed: nothing ever changes it.
+# (To pin models yourself: GEMINI_MODELS in .env wins over the discovery.)
+
+[resurface]
+standalone_image_probability = 0.15   # probability that a message is a standalone captioned image instead of a principle
+runs_per_day = 24                     # the scheduled task runs every hour
+quiet_hours_start = 0                 # from this hour (inclusive) nothing is sent
+daily_count = 5                       # how many principles per day on average
+quiet_hours_end = 0                   # until this hour (exclusive). Start = end means no quiet hours (disabled)
+
+[telegram]
+max_attempts = 3                      # send attempts per message
+retry_delay_seconds = 3
+network_retries = 4                   # if the network is down (DNS or connection): how many extra attempts after the normal ones, each after a longer wait
+network_retry_max_seconds = 300.0     # longest wait between two attempts while the network is down (seconds)
+network_retry_base_seconds = 5.0      # first wait; it triples with every attempt (5, then 15, then 45, then 135 seconds = about 3.5 minutes)
+album_min_upload_kbps = 40.0          # slowest upload speed still waited for (kilobytes per second): album upload timeout = its size / this speed + the margin, and never below 30 seconds
+album_timeout_margin_seconds = 30.0   # margin added to the album upload timeout (seconds)
+
+[audio]
+duration_tolerance_seconds = 10.0     # difference between the file's length and the video's length that still counts as a sound download
+info_timeout_seconds = 300.0          # longest wait for reading the video data from YouTube (yt-dlp): after that the command is stopped, counted as a failure and retried from the queue
+download_timeout_seconds = 3600.0     # longest wait for downloading and converting the audio
+probe_timeout_seconds = 60.0          # longest wait for reading the length of an audio file (ffmpeg)
+
+[transcript]
+min_words_per_minute = 40             # below this the model most likely skipped speech
+min_seconds_for_rate_check = 120      # this check runs on recordings longer than this
+
+[extract_guard]
+max_repair_growth = 2                 # a repaired passage may not grow beyond the model's wording by more than this factor
+min_repair_coverage = 0.5             # lowest share of the model's words that must be found in the text
+
+[waits]
+timeout_margin = 2.0                  # wait limit = margin x the slowest success recorded for the call kind
+timeout_floor_seconds = 120.0         # lowest wait limit for any call kind
+long_wait_floor_seconds = 450.0       # lowest wait limit for the big calls (listen and extract)
+stream_stall_seconds = 120.0          # silence allowed between two pieces of a reply that arrives in parts
+long_wait_seconds_per_audio_minute = 20.0   # the wait limit of listen and extract grows with the recording length: not less than (recording minutes x this number) seconds, and the 900-second ceiling rises with it (0 = no growth). A 34-minute video = 680 seconds, two hours = 2400
+exhaustion_recheck_seconds = 1800.0   # how often a model whose daily quota ran out is asked again
+
+[models]
+chain_length = 3                      # how many models, newest first, in the chain
+family = "hydrogen"                   # the model family the chain is built from: exactly gemini-<number>-<name> (no lite, no preview, no alias). "flash" restores the former chain
+last_resort = "gemini-4-hydrogen"     # the chain if Google has never been asked (no saved list at all)
+after = ["gemini-3.8-flash", "gemini-3.6-flash"]   # models by name that follow the chain family in exactly this order; if the list is emptied ([]) the chain is the family alone
+refresh_hours = 6.0                   # how often Google is asked for the available models
+failures_to_count_as_down = 2         # consecutive failures that make a model count as down in the "all models are failing" alert (the chain order is fixed and nothing changes it)
+
+[alerts]                              # alerts are rare on purpose: one message only, for a problem still present after the system tried to repair it
+max_per_day = 2                       # most messages per day (many problems go into one message)
+persist_minutes = 60                  # a stopped listener or a disabled task: wait this long before reporting
+models_down_hours = 12.0              # all models failing (not quota): wait this long before reporting
+min_free_gb = 5.0                     # least free disk space before reporting
+
+[maintenance]
+ytdlp_check_days = 7.0                # how often to look for a newer yt-dlp
+ytdlp_failure_retry_hours = 6.0       # if a yt-dlp command fails: try to fetch a newer one at most this often
+orphan_max_hours = 6.0                # a "running" processing older than this counts as orphaned whatever its process id says (ids are reused)
+heartbeat_seconds = 300               # how often a processing beats on its row in the queue
+orphan_run_minutes = 20.0             # a video processing that stopped beating (the machine was shut down or the listener died): after this time, and once its process is confirmed dead, the retry task finishes it by itself
+
+[retention]                          # automatic housekeeping: moves (never deletes) to backups\retired_<date> inside the project
+backups_days = 60.0                   # any backup older than this is moved (protected by name: auto, restructure_20261006_before, system_full_20261024_013225 and every db_* are never touched)
+run_logs_days = 60.0                  # run logs logs\<date_time>.log older than this are moved (lifecompass.log and resurface.log are never touched)
+
+[snapshots]                          # automatic daily copy of the database (backups\db_daily): once a day, and only if the database changed since the last copy
+keep = 14                             # how many of the newest copies stay; older ones are moved (not deleted) to backups\retired_<date>\db_daily
+
+[retry]                              # the retry task (every 5 minutes)
+max_attempts = 36                     # attempts per video (36 x 5 minutes = 3 hours) before giving up and reporting
+max_delivery_attempts = 288             # Telegram delivery attempts (288 x 5 minutes = one day) before stopping quietly (the principles still come back through the random resurfacing)
+
+[liveness]                           # listener monitoring
+hung_after = 3                       # consecutive checks it is stuck in before it is restarted
+launch_grace_seconds = 60             # a listener started less than this long ago is not started again (the watchdog and the hourly check may meet)

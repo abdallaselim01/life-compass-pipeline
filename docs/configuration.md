@@ -1,0 +1,28 @@
+# Configuration, models, maintenance and diagnostics
+
+## config.toml
+
+Every number that may change lives in `config.toml` at the project root (the quiet hours, the probability of a standalone image, Telegram attempts, wait margins, guard limits, and so on). Every key has a built-in default in `src/lifecompass/tunables.py`, so any line can be removed, and a wrong or out-of-range value is ignored with a warning in the log. A change takes effect when the process starts: scheduled tasks on every run, the listener after a restart (the watchdog does that). The prompts and the API settings that go into the stage fingerprints are deliberately not in it. Secrets live in `.env`.
+
+## Models
+
+The only model name written down is the **model family**, a setting in `config.toml` (`[models] family`, currently `hydrogen`; `flash` restores the former chain). `src/lifecompass/modelchain.py` asks Google (every 6 hours, without spending quota) and picks the newest 3 stable models of that family (exactly `gemini-<number>-<family>`, so currently `gemini-4-hydrogen`; if `gemini-5-hydrogen` appears it becomes first and the older one follows). After them come the names written in `[models] after`, in exactly that order (currently `gemini-3.8-flash`, then `gemini-3.6-flash`; with an empty list `[]` the chain is the family alone). If Google has never been asked, `[models] last_resort` is used.
+
+**The order of the chain never changes, for any reason**: neither failures nor successes move a model. Every attempt is recorded in `data/model_health.json` (consecutive failures and the last reply), used only for the "all models are failing" alert and for `scripts/list_models.py`. The saved list from Google is in `data/models_cache.json`. To pin models yourself, set `GEMINI_MODELS` (and `GEMINI_MODELS_LISTEN`) in `.env`: it wins over the discovery. `python scripts/list_models.py` shows the current chain and the state of each model.
+
+## Self-maintenance and alerts
+
+A scheduled task runs every hour (`LifeCompass Health Check` -> `scripts/health_check.py` -> `src/lifecompass/health.py`). The order is always: look, repair, and only then (if a problem is still there) tell you.
+
+- **It checks:** the listener answers on its port; every scheduled task exists and is enabled (a missing or disabled task is registered or enabled from its copy in `windows_config/scheduled_tasks`; `scripts/install_tasks.py` does the same on demand); the database's integrity (`quick_check`); free disk space; that the Gemini models are not all failing (other than by quota); and that the Telegram token and the Gemini keys are not rejected by their provider (only a clear rejection counts; no answer is not a problem). It also takes a **daily database snapshot** (`src/lifecompass/snapshots.py` -> `backups/db_daily/<date_time>`): once a day, and only if the database changed, verified before it is accepted; the newest 14 are kept (`[snapshots] keep`) and older ones are moved, not deleted, to `backups/retired_*/db_daily`.
+- **It sends a Telegram message in one case only:** a problem that is still present after a repair attempt and has lasted long enough (a stopped listener or a disabled task: one hour; all models failing: 12 hours; the rest immediately). **Once** per problem (it repeats only if the problem was fixed and came back), at most **two messages a day**, many problems in one message. There are no "all is well" messages, no weekly report and no silence by hour. If Telegram itself is unreachable the message waits and is retried the next hour (and if the token is clearly rejected, a single small Windows notification is shown, because Telegram is the channel that died). The numbers are in `config.toml` (`[alerts]`).
+- **yt-dlp keeps itself up to date:** the system keeps its own copy in `vendor/` inside the project (no outside install, no virtual environment). Every week, and also when a yt-dlp command fails (at most every 6 hours), it looks for a newer release, installs it in a temporary folder, tries it, and replaces the old one only on success (the old copy is moved to `backups/ytdlp_vendor_<version>_<time>`, never deleted). See `src/lifecompass/ytdlp_update.py`.
+- **Retention:** `src/lifecompass/retention.py` moves (never deletes) backups and run logs older than 60 days to `backups/retired_<date>`; a few backups are protected by name. The limits are in `config.toml` (`[retention]`).
+
+## Diagnostics
+
+- **`logs/`**: every run (bookmarklet, Task Scheduler or listener) writes its own log named by date and time (`YYYYMMDD_HHMMSS.log`). The first thing to check when something did not go as expected.
+- **`logs/lifecompass.log`**: the combined log of everything, useful for finding a pattern over a long period. Several processes write to it, so each write is protected by an inter-process lock and nobody keeps the file open; when it passes 5 MB the hourly maintenance moves it to `logs/archive/` (not deleted; after 60 days `retention.py` moves it to `backups/retired_*`).
+- **`listener.log`** (project root): the listener's own output (prints and Python errors). If immediate delivery does not work, start here. It is not tracked in git. When it passes 5 MB it is moved (not deleted) to `logs/archive/` at the moment the listener starts (`start_listener_silent.vbs`), never while it runs.
+- **`logs/resurface.log`**: the random-resurfacing messages and the decisions of `pick_for_resurfacing`; use it if resurfacing messages do not arrive or arrive at a strange rate.
+- If the logs show no clear cause, `scripts/list_principles.py` gives a direct diagnostic view of the database itself.
